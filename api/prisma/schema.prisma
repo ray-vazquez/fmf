@@ -1,0 +1,172 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  provider     AuthProvider
+  providerId   String
+  email        String   @unique
+  name         String?
+  avatarUrl    String?
+
+  favorites    FavoriteMarket[]
+  visits       VisitedMarket[]
+  tasks        Task[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([provider, providerId])
+}
+
+model Market {
+  id               Int      @id @default(autoincrement())
+  usdaMarketId     Int      @unique
+  name             String
+
+  website          String?  @db.Text
+  facebook         String?  @db.Text
+  twitter          String?  @db.Text
+  youtube          String?  @db.Text
+  otherMedia       String?  @db.Text
+
+  addressLine1     String?  @db.Text
+  city             String
+  county           String?
+  state            String
+  postalCode       String?
+  locationDescription String?  @db.Text
+
+  latitude         Float?
+  longitude        Float?
+
+  season1Date      String?  @db.Text
+  season1Time      String?  @db.Text
+  season2Date      String?  @db.Text
+  season2Time      String?  @db.Text
+  season3Date      String?  @db.Text
+  season3Time      String?  @db.Text
+  season4Date      String?  @db.Text
+  season4Time      String?  @db.Text
+
+  acceptsCredit          Boolean @default(false)
+  acceptsWIC             Boolean @default(false)
+  acceptsWICCash         Boolean @default(false)
+  acceptsSeniorFMNP      Boolean @default(false)
+  acceptsSNAP            Boolean @default(false)
+
+  hasOrganic             Boolean @default(false)
+  hasBakedGoods          Boolean @default(false)
+  hasCheese              Boolean @default(false)
+  hasCrafts              Boolean @default(false)
+  hasFlowers             Boolean @default(false)
+  hasEggs                Boolean @default(false)
+  hasSeafood             Boolean @default(false)
+  hasHerbs               Boolean @default(false)
+  hasVegetables          Boolean @default(false)
+  hasHoney               Boolean @default(false)
+  hasJams                Boolean @default(false)
+  hasMaple               Boolean @default(false)
+  hasMeat                Boolean @default(false)
+  hasNursery             Boolean @default(false)
+  hasNuts                Boolean @default(false)
+  hasPlants              Boolean @default(false)
+  hasPoultry             Boolean @default(false)
+  hasPreparedFoods       Boolean @default(false)
+  hasSoap                Boolean @default(false)
+  hasTrees               Boolean @default(false)
+  hasWine                Boolean @default(false)
+  hasCoffee              Boolean @default(false)
+  hasBeans               Boolean @default(false)
+  hasFruits              Boolean @default(false)
+  hasGrains              Boolean @default(false)
+  hasJuices              Boolean @default(false)
+  hasMushrooms           Boolean @default(false)
+  hasPetFood             Boolean @default(false)
+  hasTofu                Boolean @default(false)
+  hasWildHarvested       Boolean @default(false)
+
+  lastUsdaUpdateRaw      String?  @db.Text
+
+  favorites        FavoriteMarket[]
+  visits           VisitedMarket[]
+  tasks            Task[]
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([state, city])
+  @@index([postalCode])
+  @@index([latitude, longitude])
+}
+
+model FavoriteMarket {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  market    Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  marketId  Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, marketId])
+}
+
+model VisitedMarket {
+  id             Int      @id @default(autoincrement())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  market         Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  marketId       Int
+
+  firstVisitedAt DateTime @default(now())
+  lastVisitedAt  DateTime @default(now())
+  visitCount     Int      @default(1)
+  lastDistanceM  Int?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, marketId])
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+}
+
+model Task {
+  id          Int        @id @default(autoincrement())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+
+  title       String     @db.Text
+  notes       String?    @db.Text
+  status      TaskStatus @default(PENDING)
+
+  market      Market?    @relation(fields: [marketId], references: [id])
+  marketId    Int?
+
+  poiId       String?
+  poiName     String?
+  poiCategory String?
+  poiLat      Float?
+  poiLng      Float?
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([marketId])
+}
