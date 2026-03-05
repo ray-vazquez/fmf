@@ -1,56 +1,94 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
-import { Spinner } from "../components/ui/Spinner";
-import { marketsAPI } from "../api/endpoints/markets";
-import { weatherAPI } from "../api/endpoints/weather";
-import { placesAPI } from "../api/endpoints/places";
-import { userAPI } from "../api/endpoints/user";
+import { useAuth } from "../hooks/useAuth";
+import { getMarketById, getMarketWeather, getMarketPlaces } from "../api/endpoints/markets";
+import { addFavorite, removeFavorite, markVisit } from "../api/endpoints/user";
 import { Market, WeatherForecast, Place } from "../api/types";
-import { useAuth } from "../context/AuthContext";
-import { formatTime } from "../utils/format";
+import { useGeolocation } from "../hooks/useGeolocation";
+import { haversineDistance } from "../utils/distance";
 
 const Container = styled.div`
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 2rem;
 `;
 
 const Header = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
   margin-bottom: 2rem;
 `;
 
 const Title = styled.h1`
-  font-size: 2rem;
+  font-size: 2.5rem;
+  font-weight: 800;
   margin-bottom: 0.5rem;
 `;
 
 const Location = styled.p`
-  font-size: 1.125rem;
-  color: ${(props) => props.theme.colors.neutral.gray600};
-  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  color: ${(p) => p.theme.colors.neutral.gray600};
 `;
 
 const Actions = styled.div`
   display: flex;
   gap: 1rem;
-  margin-bottom: 2rem;
+`;
+
+const Button = styled.button<{ variant?: "primary" | "secondary" }>`
+  padding: 0.75rem 1.5rem;
+  background: ${(p) =>
+    p.variant === "secondary" ? p.theme.colors.neutral.gray200 : p.theme.colors.primary.main};
+  color: ${(p) => (p.variant === "secondary" ? p.theme.colors.neutral.gray800 : "white")};
+  border: none;
+  border-radius: ${(p) => p.theme.borderRadius.md};
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const Section = styled.section`
-  margin-bottom: 2rem;
+  margin-bottom: 3rem;
 `;
 
 const SectionTitle = styled.h2`
   font-size: 1.5rem;
+  font-weight: 700;
   margin-bottom: 1rem;
 `;
 
 const InfoGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+`;
+
+const InfoCard = styled.div`
+  background: white;
+  padding: 1.5rem;
+  border-radius: ${(p) => p.theme.borderRadius.md};
+  box-shadow: ${(p) => p.theme.shadow.sm};
+`;
+
+const InfoTitle = styled.h3`
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+`;
+
+const InfoItem = styled.p`
+  margin-bottom: 0.5rem;
+  color: ${(p) => p.theme.colors.neutral.gray700};
 `;
 
 const WeatherGrid = styled.div`
@@ -59,178 +97,197 @@ const WeatherGrid = styled.div`
   gap: 1rem;
 `;
 
-const WeatherDay = styled(Card)`
+const WeatherCard = styled.div`
+  background: white;
+  padding: 1rem;
+  border-radius: ${(p) => p.theme.borderRadius.md};
+  box-shadow: ${(p) => p.theme.shadow.sm};
   text-align: center;
 `;
 
-const PlaceCard = styled(Card)`
-  margin-bottom: 1rem;
+const PlacesList = styled.div`
+  display: grid;
+  gap: 1rem;
+`;
+
+const PlaceCard = styled.div`
+  background: white;
+  padding: 1rem;
+  border-radius: ${(p) => p.theme.borderRadius.md};
+  box-shadow: ${(p) => p.theme.shadow.sm};
+`;
+
+const Loading = styled.div`
+  text-align: center;
+  padding: 3rem;
 `;
 
 export default function MarketDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  
+  const { user } = useAuth();
+  const { location } = useGeolocation();
+
   const [market, setMarket] = useState<Market | null>(null);
-  const [weather, setWeather] = useState<WeatherForecast | null>(null);
+  const [weather, setWeather] = useState<WeatherForecast[]>([]);
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+    if (id) {
+      loadMarketData(parseInt(id));
+    }
+  }, [id]);
 
-    Promise.all([
-      marketsAPI.getById(parseInt(id)),
-      weatherAPI.getForecast(parseInt(id)),
-      placesAPI.getNearby(parseInt(id)),
-    ])
-      .then(([marketData, weatherData, placesData]) => {
-        setMarket(marketData);
-        setIsFavorite(marketData.isFavorite || false);
-        setWeather(weatherData);
-        setPlaces(placesData);
-      })
-      .catch((err) => {
-        console.error(err);
-        alert("Failed to load market details");
-        navigate("/markets");
-      })
-      .finally(() => setLoading(false));
-  }, [id, navigate]);
+  useEffect(() => {
+    if (market && location && user) {
+      checkAndMarkVisit();
+    }
+  }, [market, location, user]);
 
-  const handleFavorite = async () => {
-    if (!isAuthenticated) {
+  async function loadMarketData(marketId: number) {
+    try {
+      const [marketData, weatherData, placesData] = await Promise.all([
+        getMarketById(marketId),
+        getMarketWeather(marketId).catch(() => []),
+        getMarketPlaces(marketId).catch(() => []),
+      ]);
+
+      setMarket(marketData);
+      setIsFavorite(marketData.isFavorite || false);
+      setWeather(weatherData);
+      setPlaces(placesData);
+    } catch (err) {
+      console.error("Failed to load market:", err);
+      alert("Market not found");
+      navigate("/markets");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function checkAndMarkVisit() {
+    if (!market || !location || !market.latitude || !market.longitude) return;
+
+    const distance = haversineDistance(
+      location.lat,
+      location.lng,
+      market.latitude,
+      market.longitude
+    );
+
+    // Within 500m (0.5km) = visiting
+    if (distance <= 0.5) {
+      try {
+        await markVisit(market.id, Math.round(distance * 1000));
+      } catch (err) {
+        console.error("Failed to mark visit:", err);
+      }
+    }
+  }
+
+  async function handleFavorite() {
+    if (!user) {
       navigate("/login");
       return;
     }
-    if (!market) return;
 
     try {
       if (isFavorite) {
-        await userAPI.removeFavorite(market.id);
+        await removeFavorite(market!.id);
+        setIsFavorite(false);
       } else {
-        await userAPI.addFavorite(market.id);
+        await addFavorite(market!.id);
+        setIsFavorite(true);
       }
-      setIsFavorite(!isFavorite);
     } catch (err) {
-      console.error(err);
-      alert("Failed to update favorite");
+      console.error("Failed to update favorite:", err);
     }
-  };
+  }
 
-  const handleVisit = async () => {
-    if (!isAuthenticated) {
-      navigate("/login");
-      return;
-    }
-    if (!market) return;
-
-    try {
-      await userAPI.markVisit(market.id);
-      alert("Visit recorded!");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to record visit");
-    }
-  };
-
-  if (loading) return <Spinner />;
-  if (!market) return null;
+  if (loading) return <Loading>Loading market details...</Loading>;
+  if (!market) return <Loading>Market not found</Loading>;
 
   return (
     <Container>
       <Header>
-        <Title>{market.name}</Title>
-        <Location>
-          {market.addressLine1 && `${market.addressLine1}, `}
-          {market.city}, {market.state} {market.postalCode}
-        </Location>
+        <div>
+          <Title>{market.name}</Title>
+          <Location>
+            {market.city}, {market.state} {market.postalCode}
+          </Location>
+        </div>
         <Actions>
-          <Button onClick={handleFavorite}>
-            {isFavorite ? "❤️ Favorited" : "🤍 Add to Favorites"}
+          <Button variant="secondary" onClick={() => navigate("/markets")}>
+            ← Back
           </Button>
-          <Button variant="outline" onClick={handleVisit}>
-            ✅ Mark Visit
+          <Button onClick={handleFavorite}>
+            {isFavorite ? "⭐ Favorited" : "☆ Add Favorite"}
           </Button>
         </Actions>
       </Header>
 
-      <Section>
-        <SectionTitle>Information</SectionTitle>
-        <InfoGrid>
-          <Card>
-            <h3>🕒 Hours</h3>
-            <p>{formatTime(market.season1Time)}</p>
-            {market.season1Date && (
-              <p style={{ fontSize: "0.875rem", marginTop: "0.5rem" }}>
-                {market.season1Date}
-              </p>
-            )}
-          </Card>
-          <Card>
-            <h3>💳 Payments</h3>
-            {market.acceptsSNAP && <p>✅ SNAP/EBT</p>}
-            {market.acceptsCredit && <p>✅ Credit Cards</p>}
-            {!market.acceptsSNAP && !market.acceptsCredit && <p>Cash only</p>}
-          </Card>
-          <Card>
-            <h3>🌱 Products</h3>
-            {market.hasVegetables && <p>✅ Vegetables</p>}
-            {market.hasFruits && <p>✅ Fruits</p>}
-            {market.hasOrganic && <p>✅ Organic</p>}
-          </Card>
-        </InfoGrid>
-        {market.website && (
-          <Card style={{ marginTop: "1rem" }}>
-            <a
-              href={market.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#16a34a" }}
-            >
-              🌐 Visit Website →
-            </a>
-          </Card>
-        )}
-      </Section>
+      <InfoGrid>
+        <InfoCard>
+          <InfoTitle>📍 Location</InfoTitle>
+          {market.addressLine1 && <InfoItem>{market.addressLine1}</InfoItem>}
+          <InfoItem>
+            {market.city}, {market.state} {market.postalCode}
+          </InfoItem>
+          {market.distanceKm && <InfoItem>🚶 {market.distanceKm.toFixed(1)} km away</InfoItem>}
+        </InfoCard>
 
-      {weather && weather.days && weather.days.length > 0 && (
+        <InfoCard>
+          <InfoTitle>📅 Hours</InfoTitle>
+          {market.season1Date && <InfoItem>{market.season1Date}</InfoItem>}
+          {market.season1Time && <InfoItem>{market.season1Time}</InfoItem>}
+          {!market.season1Date && !market.season1Time && <InfoItem>Hours not available</InfoItem>}
+        </InfoCard>
+
+        <InfoCard>
+          <InfoTitle>💳 Payment</InfoTitle>
+          {market.acceptsCredit && <InfoItem>✅ Credit/Debit</InfoItem>}
+          {market.acceptsSNAP && <InfoItem>✅ SNAP/EBT</InfoItem>}
+          {market.acceptsWIC && <InfoItem>✅ WIC</InfoItem>}
+          {!market.acceptsCredit && !market.acceptsSNAP && !market.acceptsWIC && (
+            <InfoItem>Cash only</InfoItem>
+          )}
+        </InfoCard>
+      </InfoGrid>
+
+      {weather.length > 0 && (
         <Section>
-          <SectionTitle>🌤️ Weather Forecast</SectionTitle>
+          <SectionTitle>🌤️ 5-Day Weather Forecast</SectionTitle>
           <WeatherGrid>
-            {weather.days.map((day, idx) => (
-              <WeatherDay key={idx}>
-                <div style={{ fontSize: "2rem" }}>
-                  {day.icon && (
-                    <img
-                      src={`https://openweathermap.org/img/wn/${day.icon}@2x.png`}
-                      alt={day.description}
-                      width="60"
-                    />
-                  )}
+            {weather.map((day) => (
+              <WeatherCard key={day.date}>
+                <div style={{ fontSize: "2rem" }}>🌤️</div>
+                <div style={{ fontWeight: 600 }}>{new Date(day.date).toLocaleDateString()}</div>
+                <div style={{ fontSize: "1.5rem", margin: "0.5rem 0" }}>{day.temp}°F</div>
+                <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>{day.description}</div>
+                <div style={{ fontSize: "0.75rem", marginTop: "0.5rem" }}>
+                  💧 {day.pop}%
                 </div>
-                <p style={{ fontWeight: "600" }}>{day.temp}°F</p>
-                <p style={{ fontSize: "0.875rem" }}>{day.description}</p>
-              </WeatherDay>
+              </WeatherCard>
             ))}
           </WeatherGrid>
         </Section>
       )}
 
-      {places && places.length > 0 && (
+      {places.length > 0 && (
         <Section>
-          <SectionTitle>🗺️ Nearby Places</SectionTitle>
-          {places.slice(0, 5).map((place) => (
-            <PlaceCard key={place.id}>
-              <h3>{place.name}</h3>
-              <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-                {place.category} • {Math.round(place.distance)}m away
-              </p>
-              {place.address && <p style={{ fontSize: "0.875rem" }}>{place.address}</p>}
-            </PlaceCard>
-          ))}
+          <SectionTitle>📍 Nearby Places</SectionTitle>
+          <PlacesList>
+            {places.slice(0, 10).map((place) => (
+              <PlaceCard key={place.id}>
+                <div style={{ fontWeight: 600 }}>{place.name}</div>
+                <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+                  {place.category} • {place.distance}m away
+                </div>
+              </PlaceCard>
+            ))}
+          </PlacesList>
         </Section>
       )}
     </Container>

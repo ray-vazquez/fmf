@@ -1,180 +1,159 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import styled from "styled-components";
-import { Input } from "../components/ui/Input";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
-import { Spinner } from "../components/ui/Spinner";
-import { marketsAPI } from "../api/endpoints/markets";
+import { searchMarkets, findNearbyMarkets } from "../api/endpoints/markets";
 import { Market } from "../api/types";
 import { useDebounce } from "../hooks/useDebounce";
-import { useGeolocation } from "../hooks/useGeolocation";
-import { formatDistance } from "../utils/format";
+import MarketCard from "../components/features/MarketCard";
 
 const Container = styled.div`
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
-`;
-
-const Title = styled.h1`
-  margin-bottom: 2rem;
+  padding: 2rem;
 `;
 
 const SearchBox = styled.div`
   margin-bottom: 2rem;
 `;
 
-const SearchRow = styled.div`
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
+const Input = styled.input`
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid ${(p) => p.theme.colors.neutral.gray300};
+  border-radius: ${(p) => p.theme.borderRadius.md};
+  font-size: 1rem;
+
+  &:focus {
+    outline: none;
+    border-color: ${(p) => p.theme.colors.primary.main};
+  }
 `;
 
 const Results = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  margin-top: 1rem;
 `;
 
-const MarketCard = styled(Card)`
-  cursor: pointer;
+const ResultsHeader = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: center;
+  margin-bottom: 1.5rem;
 `;
 
-const MarketInfo = styled.div`
-  flex: 1;
-`;
-
-const MarketName = styled.h3`
-  font-size: 1.25rem;
-  margin-bottom: 0.5rem;
-  color: ${(props) => props.theme.colors.neutral.gray900};
-`;
-
-const MarketLocation = styled.p`
-  color: ${(props) => props.theme.colors.neutral.gray600};
-`;
-
-const Distance = styled.span`
-  color: ${(props) => props.theme.colors.primary.main};
+const ResultsCount = styled.p`
+  color: ${(p) => p.theme.colors.neutral.gray600};
   font-weight: 600;
 `;
 
+const Grid = styled.div`
+  display: grid;
+  gap: 1.5rem;
+`;
+
+const Loading = styled.div`
+  text-align: center;
+  padding: 3rem;
+  color: ${(p) => p.theme.colors.neutral.gray500};
+`;
+
+const Empty = styled.div`
+  text-align: center;
+  padding: 3rem;
+  color: ${(p) => p.theme.colors.neutral.gray500};
+`;
+
 export default function Markets() {
-  const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(false);
-  const [useNearby, setUseNearby] = useState(false);
-  
+  const [error, setError] = useState<string | null>(null);
+
   const debouncedQuery = useDebounce(query, 500);
-  const { latitude, longitude, error: geoError } = useGeolocation();
 
   useEffect(() => {
-    if (useNearby && latitude && longitude) {
-      setLoading(true);
-      marketsAPI
-        .nearby(latitude, longitude, 25)
-        .then(setMarkets)
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    const lat = searchParams.get("lat");
+    const lng = searchParams.get("lng");
+    const q = searchParams.get("q");
+
+    if (lat && lng) {
+      handleNearbySearch(parseFloat(lat), parseFloat(lng));
+    } else if (q) {
+      setQuery(q);
     }
-  }, [useNearby, latitude, longitude]);
+  }, [searchParams]);
 
   useEffect(() => {
-    if (!useNearby && debouncedQuery.trim()) {
-      setLoading(true);
-      marketsAPI
-        .search(debouncedQuery)
-        .then(setMarkets)
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    if (debouncedQuery.trim().length >= 2) {
+      handleSearch(debouncedQuery);
+    } else if (debouncedQuery.trim().length === 0) {
+      setMarkets([]);
     }
-  }, [debouncedQuery, useNearby]);
+  }, [debouncedQuery]);
 
-  const handleNearbyClick = () => {
-    if (geoError) {
-      alert("Geolocation not available: " + geoError);
-      return;
+  async function handleSearch(searchQuery: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const results = await searchMarkets(searchQuery);
+      setMarkets(results);
+    } catch (err: any) {
+      setError(err.message || "Search failed");
+      setMarkets([]);
+    } finally {
+      setLoading(false);
     }
-    setUseNearby(true);
-    setQuery("");
-  };
+  }
 
-  const handleSearchMode = () => {
-    setUseNearby(false);
-    setMarkets([]);
-  };
+  async function handleNearbySearch(lat: number, lng: number) {
+    setLoading(true);
+    setError(null);
+    try {
+      const results = await findNearbyMarkets(lat, lng);
+      setMarkets(results);
+    } catch (err: any) {
+      setError(err.message || "Nearby search failed");
+      setMarkets([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <Container>
-      <Title>Find Farmers Markets</Title>
-      
       <SearchBox>
-        <SearchRow>
-          <Input
-            type="text"
-            placeholder="Search by ZIP, city, or market name..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              if (useNearby) setUseNearby(false);
-            }}
-            disabled={useNearby}
-          />
-          {!useNearby && (
-            <Button onClick={handleNearbyClick}>
-              📍 Near Me
-            </Button>
-          )}
-          {useNearby && (
-            <Button variant="outline" onClick={handleSearchMode}>
-              Search
-            </Button>
-          )}
-        </SearchRow>
-        {useNearby && (
-          <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-            Showing markets within 25km of your location
-          </p>
-        )}
+        <Input
+          type="text"
+          placeholder="Search by ZIP, city, state, or market name..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </SearchBox>
 
-      {loading && <Spinner />}
+      {loading && <Loading>Searching...</Loading>}
 
-      <Results>
-        {markets.map((market) => (
-          <Link key={market.id} to={`/market/${market.id}`}>
-            <MarketCard>
-              <MarketInfo>
-                <MarketName>{market.name}</MarketName>
-                <MarketLocation>
-                  {market.city}, {market.state} {market.postalCode}
-                </MarketLocation>
-                {market.season1Time && (
-                  <p style={{ fontSize: "0.875rem", marginTop: "0.5rem" }}>
-                    {market.season1Time}
-                  </p>
-                )}
-              </MarketInfo>
-              {market.distanceKm !== undefined && (
-                <Distance>{formatDistance(market.distanceKm)}</Distance>
-              )}
-            </MarketCard>
-          </Link>
-        ))}
-        {!loading && markets.length === 0 && (debouncedQuery || useNearby) && (
-          <p style={{ textAlign: "center", color: "#6b7280" }}>
-            No markets found. Try a different search.
-          </p>
-        )}
-        {!loading && markets.length === 0 && !debouncedQuery && !useNearby && (
-          <p style={{ textAlign: "center", color: "#6b7280" }}>
-            Enter a ZIP code, city, or market name to search.
-          </p>
-        )}
-      </Results>
+      {error && <Empty>Error: {error}</Empty>}
+
+      {!loading && !error && (
+        <Results>
+          {markets.length > 0 ? (
+            <>
+              <ResultsHeader>
+                <ResultsCount>
+                  Found {markets.length} {markets.length === 1 ? "market" : "markets"}
+                </ResultsCount>
+              </ResultsHeader>
+              <Grid>
+                {markets.map((market) => (
+                  <MarketCard key={market.id} market={market} />
+                ))}
+              </Grid>
+            </>
+          ) : (
+            query && <Empty>No markets found. Try a different search.</Empty>
+          )}
+        </Results>
+      )}
     </Container>
   );
 }
