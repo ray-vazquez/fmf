@@ -1,55 +1,57 @@
 import { apiClient } from "../client";
-import { Market, Task } from "../types";
+import { Market, Task, Visit } from "../types";
 
-export const userAPI = {
-  // Favorites
-  addFavorite: async (marketId: number) => {
-    const response = await apiClient.post("/user/favorites", { marketId });
-    return response.data;
-  },
+// Favorites
+export async function addFavorite(marketId: number): Promise<void> {
+  await apiClient.post("/user/favorites", { marketId });
+}
 
-  removeFavorite: async (marketId: number) => {
-    const response = await apiClient.delete(`/user/favorites/${marketId}`);
-    return response.data;
-  },
+export async function removeFavorite(marketId: number): Promise<void> {
+  await apiClient.delete(`/user/favorites/${marketId}`);
+}
 
-  getFavorites: async (): Promise<Market[]> => {
-    const response = await apiClient.get("/user/favorites");
-    return response.data;
-  },
+export async function getFavorites(): Promise<Market[]> {
+  const { data } = await apiClient.get("/user/favorites");
+  return data;
+}
 
-  // Visits
-  markVisit: async (marketId: number, distanceM?: number) => {
-    const response = await apiClient.post("/user/visit/mark", {
-      marketId,
-      distanceM,
-    });
-    return response.data;
-  },
+// Visits
+export async function markVisit(marketId: number, distanceM?: number): Promise<void> {
+  await apiClient.post("/user/visit/mark", { marketId, distanceM });
+}
 
-  getVisits: async () => {
-    const response = await apiClient.get("/user/visited");
-    return response.data;
-  },
+export async function getVisitHistory(): Promise<Visit[]> {
+  const { data } = await apiClient.get("/user/visited");
+  return data;
+}
 
-  // Tasks
-  createTask: async (data: Partial<Task>) => {
-    const response = await apiClient.post("/user/tasks", data);
-    return response.data;
-  },
+// Tasks
+export async function createTask(task: {
+  title: string;
+  notes?: string;
+  marketId?: number;
+  poiId?: string;
+  poiName?: string;
+}): Promise<Task> {
+  const { data } = await apiClient.post("/user/tasks", task);
+  return data;
+}
 
-  updateTask: async (id: number, data: Partial<Task>) => {
-    const response = await apiClient.patch(`/user/tasks/${id}`, data);
-    return response.data;
-  },
+export async function getTasks(status?: "PENDING" | "COMPLETED"): Promise<Task[]> {
+  const { data } = await apiClient.get("/user/tasks", {
+    params: status ? { status } : {},
+  });
+  return data;
+}
 
-  deleteTask: async (id: number) => {
-    const response = await apiClient.delete(`/user/tasks/${id}`);
-    return response.data;
-  },
+export async function updateTask(
+  id: number,
+  updates: { title?: string; notes?: string; status?: "PENDING" | "COMPLETED" }
+): Promise<Task> {
+  const { data } = await apiClient.patch(`/user/tasks/${id}`, updates);
+  return data;
+}
 
-  getTasks: async (): Promise<Task[]> => {
-    const response = await apiClient.get("/user/tasks");
-    return response.data;
-  },
-};
+export async function deleteTask(id: number): Promise<void> {
+  await apiClient.delete(`/user/tasks/${id}`);
+}
