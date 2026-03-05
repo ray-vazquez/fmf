@@ -5,219 +5,218 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-interface USDAMarketRow {
+interface UsdaRow {
   FMID: string;
   MarketName: string;
-  Website: string;
-  Facebook: string;
-  Twitter: string;
-  Youtube: string;
-  OtherMedia: string;
-  street: string;
+  Website?: string;
+  Facebook?: string;
+  Twitter?: string;
+  Youtube?: string;
+  OtherMedia?: string;
+  street?: string;
   city: string;
-  County: string;
+  County?: string;
   State: string;
-  zip: string;
-  Season1Date: string;
-  Season1Time: string;
-  Season2Date: string;
-  Season2Time: string;
-  Season3Date: string;
-  Season3Time: string;
-  Season4Date: string;
-  Season4Time: string;
-  x: string;
-  y: string;
-  Location: string;
-  Credit: string;
-  WIC: string;
-  WICcash: string;
-  SFMNP: string;
-  SNAP: string;
-  Organic: string;
-  Bakedgoods: string;
-  Cheese: string;
-  Crafts: string;
-  Flowers: string;
-  Eggs: string;
-  Seafood: string;
-  Herbs: string;
-  Vegetables: string;
-  Honey: string;
-  Jams: string;
-  Maple: string;
-  Meat: string;
-  Nursery: string;
-  Nuts: string;
-  Plants: string;
-  Poultry: string;
-  Prepared: string;
-  Soap: string;
-  Trees: string;
-  Wine: string;
-  Coffee: string;
-  Beans: string;
-  Fruits: string;
-  Grains: string;
-  Juices: string;
-  Mushrooms: string;
-  PetFood: string;
-  Tofu: string;
-  WildHarvested: string;
-  updateTime: string;
+  zip?: string;
+  Season1Date?: string;
+  Season1Time?: string;
+  Season2Date?: string;
+  Season2Time?: string;
+  Season3Date?: string;
+  Season3Time?: string;
+  Season4Date?: string;
+  Season4Time?: string;
+  x?: string;
+  y?: string;
+  Location?: string;
+  Credit?: string;
+  WIC?: string;
+  WICcash?: string;
+  SFMNP?: string;
+  SNAP?: string;
+  Organic?: string;
+  Bakedgoods?: string;
+  Cheese?: string;
+  Crafts?: string;
+  Flowers?: string;
+  Eggs?: string;
+  Seafood?: string;
+  Herbs?: string;
+  Vegetables?: string;
+  Honey?: string;
+  Jams?: string;
+  Maple?: string;
+  Meat?: string;
+  Nursery?: string;
+  Nuts?: string;
+  Plants?: string;
+  Poultry?: string;
+  Prepared?: string;
+  Soap?: string;
+  Trees?: string;
+  Wine?: string;
+  Coffee?: string;
+  Beans?: string;
+  Fruits?: string;
+  Grains?: string;
+  Juices?: string;
+  Mushrooms?: string;
+  PetFood?: string;
+  Tofu?: string;
+  WildHarvested?: string;
+  updateTime?: string;
 }
 
-function parseBoolean(value: string): boolean {
-  return value?.toLowerCase() === "y";
+function parseYesNo(value?: string): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toUpperCase();
+  return normalized === "Y" || normalized === "YES";
 }
 
-function parseFloat(value: string): number | null {
-  const parsed = Number(value);
-  return isNaN(parsed) ? null : parsed;
-}
-
-async function syncUSDAData() {
+async function syncUsdaData() {
   const csvPath = path.join(__dirname, "data", "usda_farmers_markets.csv");
   
   if (!fs.existsSync(csvPath)) {
-    console.error("❌ CSV file not found at:", csvPath);
-    console.log("Download from: https://catalog.data.gov/dataset/national-farmers-market-directory");
+    console.error(`❌ CSV file not found at: ${csvPath}`);
+    console.error("Please download the USDA Farmers Market Directory CSV from:");
+    console.error("https://catalog.data.gov/dataset/national-farmers-market-directory");
+    console.error(`And place it at: ${csvPath}`);
     process.exit(1);
   }
   
-  console.log("📦 Starting USDA farmers market data sync...");
-  console.log("📄 Reading CSV file:", csvPath);
+  console.log("📥 Reading USDA Farmers Market CSV...");
   
-  const markets: any[] = [];
+  const rows: UsdaRow[] = [];
   
-  return new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     fs.createReadStream(csvPath)
       .pipe(csv())
-      .on("data", (row: USDAMarketRow) => {
-        const market = {
-          usdaMarketId: parseInt(row.FMID),
-          name: row.MarketName?.trim() || "Unnamed Market",
-          
-          website: row.Website?.trim() || null,
-          facebook: row.Facebook?.trim() || null,
-          twitter: row.Twitter?.trim() || null,
-          youtube: row.Youtube?.trim() || null,
-          otherMedia: row.OtherMedia?.trim() || null,
-          
-          addressLine1: row.street?.trim() || null,
-          city: row.city?.trim() || "Unknown",
-          county: row.County?.trim() || null,
-          state: row.State?.trim() || "Unknown",
-          postalCode: row.zip?.trim() || null,
-          locationDescription: row.Location?.trim() || null,
-          
-          latitude: parseFloat(row.y),
-          longitude: parseFloat(row.x),
-          
-          season1Date: row.Season1Date?.trim() || null,
-          season1Time: row.Season1Time?.trim() || null,
-          season2Date: row.Season2Date?.trim() || null,
-          season2Time: row.Season2Time?.trim() || null,
-          season3Date: row.Season3Date?.trim() || null,
-          season3Time: row.Season3Time?.trim() || null,
-          season4Date: row.Season4Date?.trim() || null,
-          season4Time: row.Season4Time?.trim() || null,
-          
-          acceptsCredit: parseBoolean(row.Credit),
-          acceptsWIC: parseBoolean(row.WIC),
-          acceptsWICCash: parseBoolean(row.WICcash),
-          acceptsSeniorFMNP: parseBoolean(row.SFMNP),
-          acceptsSNAP: parseBoolean(row.SNAP),
-          
-          hasOrganic: parseBoolean(row.Organic),
-          hasBakedGoods: parseBoolean(row.Bakedgoods),
-          hasCheese: parseBoolean(row.Cheese),
-          hasCrafts: parseBoolean(row.Crafts),
-          hasFlowers: parseBoolean(row.Flowers),
-          hasEggs: parseBoolean(row.Eggs),
-          hasSeafood: parseBoolean(row.Seafood),
-          hasHerbs: parseBoolean(row.Herbs),
-          hasVegetables: parseBoolean(row.Vegetables),
-          hasHoney: parseBoolean(row.Honey),
-          hasJams: parseBoolean(row.Jams),
-          hasMaple: parseBoolean(row.Maple),
-          hasMeat: parseBoolean(row.Meat),
-          hasNursery: parseBoolean(row.Nursery),
-          hasNuts: parseBoolean(row.Nuts),
-          hasPlants: parseBoolean(row.Plants),
-          hasPoultry: parseBoolean(row.Poultry),
-          hasPreparedFoods: parseBoolean(row.Prepared),
-          hasSoap: parseBoolean(row.Soap),
-          hasTrees: parseBoolean(row.Trees),
-          hasWine: parseBoolean(row.Wine),
-          hasCoffee: parseBoolean(row.Coffee),
-          hasBeans: parseBoolean(row.Beans),
-          hasFruits: parseBoolean(row.Fruits),
-          hasGrains: parseBoolean(row.Grains),
-          hasJuices: parseBoolean(row.Juices),
-          hasMushrooms: parseBoolean(row.Mushrooms),
-          hasPetFood: parseBoolean(row.PetFood),
-          hasTofu: parseBoolean(row.Tofu),
-          hasWildHarvested: parseBoolean(row.WildHarvested),
-          
-          lastUsdaUpdateRaw: row.updateTime?.trim() || null,
-        };
-        
-        markets.push(market);
-      })
-      .on("end", async () => {
-        console.log(`✅ Parsed ${markets.length} markets from CSV`);
-        console.log("💾 Writing to database...");
-        
-        try {
-          let imported = 0;
-          let updated = 0;
-          
-          for (const market of markets) {
-            try {
-              await prisma.market.upsert({
-                where: { usdaMarketId: market.usdaMarketId },
-                update: market,
-                create: market,
-              });
-              
-              const existing = await prisma.market.findUnique({
-                where: { usdaMarketId: market.usdaMarketId },
-              });
-              
-              if (existing) {
-                updated++;
-              } else {
-                imported++;
-              }
-            } catch (err: any) {
-              console.error(`Error processing market ${market.usdaMarketId}:`, err.message);
-            }
-          }
-          
-          console.log("\n✨ Sync complete!");
-          console.log(`   📊 Imported: ${imported}`);
-          console.log(`   🔄 Updated: ${updated}`);
-          console.log(`   📍 Total markets in database: ${imported + updated}`);
-          
-          resolve(true);
-        } catch (err) {
-          console.error("❌ Database error:", err);
-          reject(err);
-        } finally {
-          await prisma.$disconnect();
-        }
-      })
-      .on("error", (err) => {
-        console.error("❌ CSV parsing error:", err);
-        reject(err);
-      });
+      .on("data", (row: UsdaRow) => rows.push(row))
+      .on("end", () => resolve())
+      .on("error", (err) => reject(err));
   });
+  
+  console.log(`✅ Loaded ${rows.length} markets from CSV`);
+  console.log("🔄 Syncing to database...");
+  
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  
+  for (const row of rows) {
+    try {
+      const usdaMarketId = parseInt(row.FMID);
+      
+      if (isNaN(usdaMarketId)) {
+        skipped++;
+        continue;
+      }
+      
+      const marketData = {
+        usdaMarketId,
+        name: row.MarketName || "Unknown Market",
+        website: row.Website || null,
+        facebook: row.Facebook || null,
+        twitter: row.Twitter || null,
+        youtube: row.Youtube || null,
+        otherMedia: row.OtherMedia || null,
+        addressLine1: row.street || null,
+        city: row.city || "Unknown",
+        county: row.County || null,
+        state: row.State || "Unknown",
+        postalCode: row.zip || null,
+        locationDescription: row.Location || null,
+        latitude: row.y ? parseFloat(row.y) : null,
+        longitude: row.x ? parseFloat(row.x) : null,
+        season1Date: row.Season1Date || null,
+        season1Time: row.Season1Time || null,
+        season2Date: row.Season2Date || null,
+        season2Time: row.Season2Time || null,
+        season3Date: row.Season3Date || null,
+        season3Time: row.Season3Time || null,
+        season4Date: row.Season4Date || null,
+        season4Time: row.Season4Time || null,
+        acceptsCredit: parseYesNo(row.Credit),
+        acceptsWIC: parseYesNo(row.WIC),
+        acceptsWICCash: parseYesNo(row.WICcash),
+        acceptsSeniorFMNP: parseYesNo(row.SFMNP),
+        acceptsSNAP: parseYesNo(row.SNAP),
+        hasOrganic: parseYesNo(row.Organic),
+        hasBakedGoods: parseYesNo(row.Bakedgoods),
+        hasCheese: parseYesNo(row.Cheese),
+        hasCrafts: parseYesNo(row.Crafts),
+        hasFlowers: parseYesNo(row.Flowers),
+        hasEggs: parseYesNo(row.Eggs),
+        hasSeafood: parseYesNo(row.Seafood),
+        hasHerbs: parseYesNo(row.Herbs),
+        hasVegetables: parseYesNo(row.Vegetables),
+        hasHoney: parseYesNo(row.Honey),
+        hasJams: parseYesNo(row.Jams),
+        hasMaple: parseYesNo(row.Maple),
+        hasMeat: parseYesNo(row.Meat),
+        hasNursery: parseYesNo(row.Nursery),
+        hasNuts: parseYesNo(row.Nuts),
+        hasPlants: parseYesNo(row.Plants),
+        hasPoultry: parseYesNo(row.Poultry),
+        hasPreparedFoods: parseYesNo(row.Prepared),
+        hasSoap: parseYesNo(row.Soap),
+        hasTrees: parseYesNo(row.Trees),
+        hasWine: parseYesNo(row.Wine),
+        hasCoffee: parseYesNo(row.Coffee),
+        hasBeans: parseYesNo(row.Beans),
+        hasFruits: parseYesNo(row.Fruits),
+        hasGrains: parseYesNo(row.Grains),
+        hasJuices: parseYesNo(row.Juices),
+        hasMushrooms: parseYesNo(row.Mushrooms),
+        hasPetFood: parseYesNo(row.PetFood),
+        hasTofu: parseYesNo(row.Tofu),
+        hasWildHarvested: parseYesNo(row.WildHarvested),
+        lastUsdaUpdateRaw: row.updateTime || null,
+      };
+      
+      const existing = await prisma.market.findUnique({
+        where: { usdaMarketId },
+      });
+      
+      if (existing) {
+        await prisma.market.update({
+          where: { id: existing.id },
+          data: marketData,
+        });
+        updated++;
+      } else {
+        await prisma.market.create({
+          data: marketData,
+        });
+        created++;
+      }
+      
+      if ((created + updated) % 100 === 0) {
+        console.log(`   Processed ${created + updated} markets...`);
+      }
+    } catch (err: any) {
+      console.error(`Error processing market ${row.FMID}:`, err.message);
+      skipped++;
+    }
+  }
+  
+  console.log("");
+  console.log("✅ Sync complete!");
+  console.log(`   Created: ${created}`);
+  console.log(`   Updated: ${updated}`);
+  console.log(`   Skipped: ${skipped}`);
+  console.log(`   Total: ${created + updated + skipped}`);
 }
 
-syncUSDAData()
-  .then(() => process.exit(0))
+syncUsdaData()
+  .then(() => {
+    console.log("\n🎉 USDA data sync successful!");
+    process.exit(0);
+  })
   .catch((err) => {
-    console.error(err);
+    console.error("\n❌ Sync failed:", err);
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });
