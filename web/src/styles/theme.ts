@@ -1,17 +1,16 @@
 export const theme = {
   colors: {
     primary: {
+      light: "#dcfce7",
       main: "#16a34a",
-      light: "#22c55e",
       dark: "#15803d",
     },
     accent: {
-      main: "#f97316",
-      light: "#fb923c",
-      dark: "#ea580c",
+      light: "#dbeafe",
+      main: "#3b82f6",
+      dark: "#1d4ed8",
     },
     neutral: {
-      white: "#ffffff",
       gray50: "#f9fafb",
       gray100: "#f3f4f6",
       gray200: "#e5e7eb",
@@ -22,19 +21,10 @@ export const theme = {
       gray700: "#374151",
       gray800: "#1f2937",
       gray900: "#111827",
-      black: "#000000",
     },
-    error: "#ef4444",
     success: "#10b981",
     warning: "#f59e0b",
-  },
-  spacing: {
-    xs: "0.25rem",
-    sm: "0.5rem",
-    md: "1rem",
-    lg: "1.5rem",
-    xl: "2rem",
-    "2xl": "3rem",
+    error: "#ef4444",
   },
   borderRadius: {
     sm: "0.25rem",

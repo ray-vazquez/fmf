@@ -7,17 +7,19 @@ export const GlobalStyles = createGlobalStyle`
     box-sizing: border-box;
   }
 
-  html {
-    font-size: 16px;
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background: ${(p) => p.theme.colors.neutral.gray50};
+    color: ${(p) => p.theme.colors.neutral.gray900};
   }
 
-  body {
-    font-family: "Inter", system-ui, -apple-system, sans-serif;
-    line-height: 1.5;
-    color: #1f2937;
-    background-color: #f9fafb;
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+      monospace;
   }
 
   a {
@@ -26,11 +28,6 @@ export const GlobalStyles = createGlobalStyle`
   }
 
   button {
-    font-family: inherit;
-    cursor: pointer;
-  }
-
-  input, textarea {
     font-family: inherit;
   }
 `;
