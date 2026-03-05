@@ -1,63 +1,96 @@
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, Link, useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 
 const Header = styled.header`
-  background: white;
-  box-shadow: ${(props) => props.theme.shadow.sm};
+  background: ${(p) => p.theme.colors.primary.main};
+  color: white;
   padding: 1rem 2rem;
+  box-shadow: ${(p) => p.theme.shadow.md};
 `;
 
 const Nav = styled.nav`
-  max-width: 1200px;
-  margin: 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
 `;
 
 const Logo = styled(Link)`
   font-size: 1.5rem;
   font-weight: 800;
-  color: ${(props) => props.theme.colors.primary.main};
+  color: white;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  &:hover {
+    opacity: 0.9;
+  }
 `;
 
 const NavLinks = styled.div`
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
   align-items: center;
 `;
 
 const NavLink = styled(Link)`
-  color: ${(props) => props.theme.colors.neutral.gray700};
-  font-weight: 500;
-  transition: color 0.2s;
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+  
+  &:hover {
+    opacity: 0.8;
+  }
+`;
+
+const Button = styled.button`
+  background: white;
+  color: ${(p) => p.theme.colors.primary.main};
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: ${(p) => p.theme.borderRadius.md};
+  font-weight: 600;
+  cursor: pointer;
 
   &:hover {
-    color: ${(props) => props.theme.colors.primary.main};
+    opacity: 0.9;
   }
 `;
 
 const Main = styled.main`
-  max-width: 1200px;
-  margin: 2rem auto;
-  padding: 0 2rem;
+  min-height: calc(100vh - 64px);
 `;
 
 export default function RootLayout() {
-  const { isAuthenticated } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate("/");
+  }
 
   return (
     <>
       <Header>
         <Nav>
-          <Logo to="/">🥕 Farmers Market Finder</Logo>
+          <Logo to="/">
+            <span>🥕</span>
+            <span>Farmers Market Finder</span>
+          </Logo>
           <NavLinks>
-            <NavLink to="/markets">Search</NavLink>
-            {isAuthenticated ? (
-              <NavLink to="/account">Account</NavLink>
+            <NavLink to="/markets">Find Markets</NavLink>
+            {user ? (
+              <>
+                <NavLink to="/account">My Account</NavLink>
+                <Button onClick={handleLogout}>Logout</Button>
+              </>
             ) : (
-              <NavLink to="/login">Login</NavLink>
+              <Button onClick={() => navigate("/login")}>Login</Button>
             )}
           </NavLinks>
         </Nav>

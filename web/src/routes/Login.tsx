@@ -1,81 +1,112 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
-import { useAuth } from "../context/AuthContext";
-import { authAPI } from "../api/endpoints/auth";
+import { useAuth } from "../hooks/useAuth";
 
 const Container = styled.div`
   max-width: 400px;
   margin: 4rem auto;
+  padding: 2rem;
+`;
+
+const Card = styled.div`
+  background: white;
+  border-radius: ${(p) => p.theme.borderRadius.lg};
+  padding: 2rem;
+  box-shadow: ${(p) => p.theme.shadow.lg};
 `;
 
 const Title = styled.h1`
+  font-size: 2rem;
+  font-weight: 800;
   text-align: center;
+  margin-bottom: 0.5rem;
+`;
+
+const Subtitle = styled.p`
+  text-align: center;
+  color: ${(p) => p.theme.colors.neutral.gray600};
   margin-bottom: 2rem;
 `;
 
-const ButtonGroup = styled.div`
+const Button = styled.button`
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: ${(p) => p.theme.borderRadius.md};
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &:hover {
+    opacity: 0.9;
+  }
 `;
 
-const DemoNote = styled.p`
+const GoogleButton = styled(Button)`
+  background: #4285f4;
+  color: white;
+`;
+
+const AppleButton = styled(Button)`
+  background: #000;
+  color: white;
+`;
+
+const Divider = styled.div`
   text-align: center;
-  margin-top: 1rem;
-  color: ${(props) => props.theme.colors.neutral.gray500};
+  margin: 1.5rem 0;
+  color: ${(p) => p.theme.colors.neutral.gray400};
   font-size: 0.875rem;
 `;
 
+const Note = styled.p`
+  text-align: center;
+  font-size: 0.875rem;
+  color: ${(p) => p.theme.colors.neutral.gray500};
+  margin-top: 1.5rem;
+`;
+
 export default function Login() {
-  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleDemoLogin = async (provider: "GOOGLE" | "APPLE") => {
-    setLoading(true);
+  async function handleLogin(provider: string) {
     try {
-      const demoEmail = `demo-${Date.now()}@example.com`;
-      const data = await authAPI.socialLogin(
-        provider,
-        `demo-${Date.now()}`,
-        demoEmail,
-        `Demo User`
-      );
-      login(data.token, data.user);
-      navigate("/markets");
+      await login(provider);
+      navigate("/account");
     } catch (err) {
       console.error("Login failed:", err);
       alert("Login failed. Please try again.");
-    } finally {
-      setLoading(false);
     }
-  };
+  }
 
   return (
     <Container>
       <Card>
-        <Title>Sign In</Title>
-        <ButtonGroup>
-          <Button
-            onClick={() => handleDemoLogin("GOOGLE")}
-            disabled={loading}
-          >
-            👥 Sign in with Google (Demo)
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => handleDemoLogin("APPLE")}
-            disabled={loading}
-          >
-            🍎 Sign in with Apple (Demo)
-          </Button>
-        </ButtonGroup>
-        <DemoNote>
-          This is a demo. Click any button to create a temporary account.
-        </DemoNote>
+        <Title>Welcome Back</Title>
+        <Subtitle>Sign in to access your favorites and more</Subtitle>
+
+        <GoogleButton onClick={() => handleLogin("google")}>
+          <span>🔵</span>
+          <span>Continue with Google</span>
+        </GoogleButton>
+
+        <AppleButton onClick={() => handleLogin("apple")}>
+          <span>🍎</span>
+          <span>Continue with Apple</span>
+        </AppleButton>
+
+        <Divider>—</Divider>
+
+        <Note>
+          <strong>Demo Mode:</strong> This is a demo. Click any button above to create a test account.
+          In production, real OAuth will be used.
+        </Note>
       </Card>
     </Container>
   );
