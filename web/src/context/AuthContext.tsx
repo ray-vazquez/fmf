@@ -1,62 +1,62 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { authAPI } from "../api/endpoints/auth";
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-  avatarUrl?: string;
-}
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { apiClient } from "../api/client";
+import { User } from "../api/types";
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  login: (token: string, user: User) => void;
+  loading: boolean;
+  login: (provider: string) => Promise<void>;
   logout: () => void;
-  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem("authToken");
-  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem("auth_token");
     if (token) {
-      authAPI.getMe(token)
-        .then((userData) => setUser(userData))
-        .catch(() => {
-          localStorage.removeItem("authToken");
-          setToken(null);
-        });
+      fetchCurrentUser();
+    } else {
+      setLoading(false);
     }
-  }, [token]);
+  }, []);
 
-  const login = (newToken: string, userData: User) => {
-    localStorage.setItem("authToken", newToken);
-    setToken(newToken);
-    setUser(userData);
-  };
+  async function fetchCurrentUser() {
+    try {
+      const { data } = await apiClient.get("/auth/me");
+      setUser(data);
+    } catch (err) {
+      localStorage.removeItem("auth_token");
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const logout = () => {
-    localStorage.removeItem("authToken");
-    setToken(null);
+  async function login(provider: string) {
+    // Demo login - in production, redirect to OAuth
+    const demoUser = {
+      provider: provider.toUpperCase(),
+      providerId: `demo_${Date.now()}`,
+      email: `demo@${provider}.com`,
+      name: `Demo User`,
+      avatarUrl: `https://ui-avatars.com/api/?name=Demo+User`,
+    };
+
+    const { data } = await apiClient.post("/auth/social", demoUser);
+    localStorage.setItem("auth_token", data.token);
+    setUser(data.user);
+  }
+
+  function logout() {
+    localStorage.removeItem("auth_token");
     setUser(null);
-  };
+  }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        login,
-        logout,
-        isAuthenticated: !!user,
-      }}
-    >
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
